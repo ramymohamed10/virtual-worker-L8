@@ -36,7 +36,7 @@ When the app is running, you should see output similar to the following:
 Orders to process per hour: 3600
 Order processing interval: 1 seconds
 Sleep duration between orders: 1s
-Order 86827 processed at 29.06ms with status of 1. {"orderId":"86827","customerId":"1155539187","items":[{"productId":1,"quantity":2,"price":16.143967},{"productId":3,"quantity":4,"price":78.76323},{"productId":9,"quantity":2,"price":16.52522}],"status":1}
-Order 52881 processed at 1.04s with status of 1. {"orderId":"52881","customerId":"2034932567","items":[{"productId":4,"quantity":4,"price":39.27058},{"productId":8,"quantity":4,"price":69.43897}],"status":1}
-Order 54344 processed at 2.06s with status of 1. {"orderId":"54344","customerId":"1707985022","items":[{"productId":2,"quantity":4,"price":85.28803},{"productId":1,"quantity":2,"price":89.426285},{"productId":1,"quantity":3,"price":39.145554},{"productId":5,"quantity":2,"price":29.205898}],"status":1}
+Order 86827 completed at 29.06ms with status 2
+Order 52881 completed at 1.04s with status 2
+Order 54344 completed at 2.06s with status 2
 ```

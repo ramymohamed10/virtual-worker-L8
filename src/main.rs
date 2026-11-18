@@ -36,82 +36,54 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // keep track of how long we've been running
     let start_time = Instant::now();
 
+    let client = reqwest::blocking::Client::new();
     loop {
-        // fetch the orders
-        let client = reqwest::blocking::Client::new();
-
-        let response = client
+        let orders = client
             .get(format!("{}/order/fetch", order_service_url))
-            .send();
-
-        match response {
-            Ok(res) => {
-                let json = res.text().unwrap();
-
-                if json == "null" {
-                    println!("No orders to process");
-                } else {
-                    println!("Processing orders");
-
-                    let orders: Vec<Order> = match serde_json::from_str(&json) {
-                        Ok(orders) => orders,
-                        Err(e) => {
-                            println!("Failed to parse JSON: {}", e);
-                            vec![]
-                        }
-                    };
-
-                    if orders.len() == 0 {
-                        println!("No orders to process");
-                    } else {
-                        println!("Processing {} orders", orders.len());
-
-                        // loop through the orders
-                        for mut order in orders {
-                            // update order status
-                            order.status = OrderStatus::Processing as u32;
-
-                            // send the order to the order service
-                            let serialized_order = serde_json::to_string(&order)?;
-                            let client = reqwest::blocking::Client::new();
-
-                            let response = client
-                                .put(format!("{}/order", order_service_url))
-                                .header("Content-Type", "application/json")
-                                .body(serialized_order.clone())
-                                .send();
-
-                            match response {
-                                Ok(_res) => {
-                                    // track the time it takes to generate an order
-                                    let elapsed_time = start_time.elapsed();
-
-                                    // print the order details
-                                    println!(
-                                        "Order {} processed at {:.2?} with status of {}. {}",
-                                        order.order_id,
-                                        elapsed_time,
-                                        order.status,
-                                        serialized_order
-                                    );
-                                }
-                                Err(err) => {
-                                    println!("Error completing the order: {}", err);
-                                }
-                            }
-
-                            thread::sleep(sleep_duration);
-                        }
-                    }
+            .send()
+            .and_then(|response| response.error_for_status())
+            .and_then(|response| response.text());
+        let orders = match orders {
+            Ok(body) => match serde_json::from_str::<Option<Vec<Order>>>(&body) {
+                Ok(orders) => orders.unwrap_or_default(),
+                Err(err) => {
+                    eprintln!("Invalid order response: {}", err);
+                    Vec::new()
                 }
+            },
+            Err(err) => {
+                eprintln!("Failed to fetch orders: {}", err);
+                Vec::new()
             }
-            Err(e) => {
-                println!("Failed to fetch orders: {}", e);
-                thread::sleep(sleep_duration);
+        };
+        if orders.is_empty() {
+            println!("No orders to process");
+            thread::sleep(sleep_duration);
+            continue;
+        }
+        for mut order in orders {
+            order.status = COMPLETE;
+            let response = client
+                .put(format!("{}/order", order_service_url))
+                .header("Content-Type", "application/json")
+                .body(serde_json::to_string(&order)?)
+                .send()
+                .and_then(|response| response.error_for_status());
+            match response {
+                Ok(_) => println!(
+                    "Order {} completed at {:.2?} with status {}",
+                    order.order_id,
+                    start_time.elapsed(),
+                    order.status
+                ),
+                Err(err) => eprintln!("Failed to complete order {}: {}", order.order_id, err),
             }
+            thread::sleep(sleep_duration);
         }
     }
 }
+
+const COMPLETE: u32 = 2;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Order {
@@ -129,11 +101,4 @@ struct Item {
     product_id: u32,
     quantity: u32,
     price: f32,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-enum OrderStatus {
-    Pending = 0,
-    Processing,
-    Complete,
 }
